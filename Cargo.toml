@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "nanoargs"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Anthony Sgro"]
 build = false
 exclude = ["tests/*.proptest-regressions"]
@@ -62,6 +62,14 @@ name = "extract"
 path = "examples/extract.rs"
 
 [[example]]
+name = "full_demo"
+path = "examples/full_demo.rs"
+
+[[example]]
+name = "groups_and_conflicts"
+path = "examples/groups_and_conflicts.rs"
+
+[[example]]
 name = "help_text"
 path = "examples/help_text.rs"
 
@@ -80,6 +88,10 @@ path = "tests/prop_alignment.rs"
 [[test]]
 name = "prop_api_inversion"
 path = "tests/prop_api_inversion.rs"
+
+[[test]]
+name = "prop_argument_groups"
+path = "tests/prop_argument_groups.rs"
 
 [[test]]
 name = "prop_bugfix"
