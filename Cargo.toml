@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "nanoargs"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Anthony Sgro"]
 build = false
 exclude = ["tests/*.proptest-regressions"]
@@ -44,6 +44,10 @@ path = "src/lib.rs"
 [[example]]
 name = "builder_api"
 path = "examples/builder_api.rs"
+
+[[example]]
+name = "completions"
+path = "examples/completions.rs"
 
 [[example]]
 name = "env_fallback"
@@ -80,6 +84,10 @@ path = "tests/prop_bugfix.rs"
 [[test]]
 name = "prop_colored_help"
 path = "tests/prop_colored_help.rs"
+
+[[test]]
+name = "prop_completions"
+path = "tests/prop_completions.rs"
 
 [[test]]
 name = "prop_core"
