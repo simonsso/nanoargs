@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "nanoargs"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Anthony Sgro"]
 build = false
 exclude = ["tests/*.proptest-regressions"]
@@ -69,6 +69,10 @@ path = "examples/help_text.rs"
 name = "subcommands"
 path = "examples/subcommands.rs"
 
+[[example]]
+name = "value_validation"
+path = "examples/value_validation.rs"
+
 [[test]]
 name = "prop_alignment"
 path = "tests/prop_alignment.rs"
@@ -88,6 +92,10 @@ path = "tests/prop_colored_help.rs"
 [[test]]
 name = "prop_completions"
 path = "tests/prop_completions.rs"
+
+[[test]]
+name = "prop_convenience_validators"
+path = "tests/prop_convenience_validators.rs"
 
 [[test]]
 name = "prop_core"
@@ -136,6 +144,10 @@ path = "tests/prop_typed_helpers.rs"
 [[test]]
 name = "prop_utf8_safety"
 path = "tests/prop_utf8_safety.rs"
+
+[[test]]
+name = "prop_value_validation"
+path = "tests/prop_value_validation.rs"
 
 [[test]]
 name = "prop_version"
