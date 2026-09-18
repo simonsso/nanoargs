@@ -12,22 +12,18 @@ A lightweight, zero-dependency argument parser for Rust.
   <img src="demo.gif" alt="nanoargs help output" width="700" />
 </p>
 
-Part of the nano crate family — minimal, zero-dependency building blocks for Rust:
-
-- [nanocolor](https://github.com/anthonysgro/nanocolor) — terminal colors and styles
-- [nanospinner](https://github.com/anthonysgro/nanospinner) — terminal spinners
-- [nanoprogress](https://github.com/anthonysgro/nanoprogress) — progress bars
-- [nanologger](https://github.com/anthonysgro/nanologger) — minimal logger
-- [nanotime](https://github.com/anthonysgro/nanotime) — time utilities
-- [nanoargs](https://github.com/anthonysgro/nanoargs) — argument parser
+Part of the [nano](https://github.com/anthonysgro/nano) crate family — minimal, zero-dependency building blocks for Rust.
 
 Everything you'd expect from a CLI parser — flags, options, subcommands, help generation, env fallback, typed parsing — with zero dependencies.
 
 ## Why nanoargs?
 
-`clap` pulls in 10+ transitive dependencies. `pico-args` and `lexopt` are zero-dep but skip help generation, env var fallback, and subcommands. nanoargs covers the gap: everything you'd reach for `clap` for in a typical CLI, with zero dependencies.
+Choosing a CLI parser in Rust usually feels like a compromise:
 
-If your CLI needs advanced features like derive macros, argument groups, shell completions, or value validation, `clap` and `bpaf` are great choices. nanoargs is for the common, lightweight case.
+- `clap` is the gold standard, but it's a heavy lift. It pulls in 10+ transitive dependencies, deep customization and vast api reference sheets.
+- `pico-args` / `lexopt` are zero-dep, but they leave the hard work to you. You'll end up hand-coding your own --help strings, ENV fallbacks, and subcommand logic.
+- `nanoargs` is the middle ground. You get the professional features you actually use like subcommands, help generation, and env fallbacks, with **zero** dependencies.
+
 
 | Feature | `nanoargs` | `clap` | `bpaf` | `pico-args` | `lexopt` |
 |---------|:----------:|:------:|:------:|:-----------:|:--------:|
@@ -37,7 +33,7 @@ If your CLI needs advanced features like derive macros, argument groups, shell c
 | Env var fallback | ✓ | ✓ | ✓ | ✗ | ✗ |
 | Multi-value options | ✓ | ✓ | ✓ | ✗ | ✗ |
 | Subcommands | ✓ | ✓ | ✓ | ✗† | ✗† |
-| Combined short flags (`-abc`) | ✓ | ✓ | ✓ | ✓‡ | ✓ |
+| Combined short flags (`-abc`) | ✓ | ✓ | ✓ | ✓§ | ✓ |
 | Default values | ✓ | ✓ | ✓ | ✗ | ✗ |
 | Required args | ✓ | ✓ | ✓ | ✗ | ✗ |
 | Hidden args | ✓ | ✓ | ✓ | — | — |
@@ -46,14 +42,16 @@ If your CLI needs advanced features like derive macros, argument groups, shell c
 | Shell completions | ✗ | ✓ | ✓§ | ✗ | ✗ |
 | Other advanced features | ✗ | ✓ | ✓ | ✗ | ✗ |
 
-
-
 \* `clap` with default features. With derive, ~17 total.
 \*\* `bpaf` combinatoric API has 0 deps. With derive, 5 total (`bpaf_derive` + `syn` tree).
 † No built-in support. Achievable manually by matching on positional tokens.
-‡ Via opt-in cargo features (`combined-flags`, `short-space-opt`).
 § Via opt-in cargo features.
 
+Which one should I use?
+
+- `clap` / `bpaf`: Your CLI is complex and needs deep customization and advanced support.
+- `pico-args` / `lexopt`: You’re building something tiny where most features aren't a priority.
+- `nanoargs`: You want a clean, intuitive API that supports 90% of use cases without taking on any dependencies.
 
 ## Quick Start ([full demo](examples/full_demo.rs))
 
@@ -68,30 +66,29 @@ fn main() {
     let parser = ArgBuilder::new()
         .name("myapp")
         .description("A sample CLI tool")
+        .version("1.0.0")
         .flag(Flag::new("verbose").desc("Enable verbose output").short('v'))
-        .option(Opt::new("output").placeholder("FILE").desc("Output file path"))
+        .option(Opt::new("output").placeholder("FILE").desc("Output file path").short('o'))
         .positional(Pos::new("input").desc("Input file").required())
         .build()
         .unwrap();
 
-    let args: Vec<String> = std::env::args().skip(1).collect();
-
-    match parser.parse(args) {
+    match parser.parse_env() {
         Ok(result) => {
             println!("verbose: {}", result.get_flag("verbose"));
             println!("output:  {:?}", result.get_option("output"));
             println!("input:   {:?}", result.get_positionals());
         }
-        Err(ParseError::HelpRequested(text)) => print!("{}", text),
-        Err(ParseError::VersionRequested(text)) => println!("{}", text),
-        Err(e) => eprintln!("error: {}", e),
+        Err(ParseError::HelpRequested(text)) => print!("{text}"),
+        Err(ParseError::VersionRequested(text)) => println!("{text}"),
+        Err(e) => eprintln!("error: {e}"),
     }
 }
 ```
 
-Or for throwaway scripts, see [Schema-Free Parsing](#schema-free-parsing-for-quick-scripts) below.
+See [Parsing and Results](#parsing-and-results) and [Error Handling](#error-handling) for more details.
 
-## Usage
+## Defining Arguments
 
 ### Flags ([example](examples/flags.rs))
 
@@ -127,6 +124,21 @@ myapp --output result.txt --jobs 8 --include src --include tests
 myapp -o=result.txt -j 8
 ```
 
+### Positionals ([example](examples/positionals.rs))
+
+Unnamed arguments collected in order. Chain `.required()` on the `Pos` builder to make a positional mandatory.
+
+```rust
+let parser = ArgBuilder::new()
+    .positional(Pos::new("input").desc("Input file").required())
+    .positional(Pos::new("extra").desc("Additional arguments"))
+    .build();
+```
+
+```sh
+myapp input.txt extra1 extra2
+```
+
 ### Environment Variable Fallback ([example](examples/env_fallback.rs))
 
 Options can fall back to environment variables when not provided on the command line. Chain `.env()` on the `Opt` builder. The resolution order is: CLI value → env var → default → error (if required).
@@ -157,21 +169,6 @@ Options:
   -l, --log-level <LEVEL>  Log level [env: MYAPP_LOG_LEVEL]
   -o, --output <FILE>      Output file (required) [env: MYAPP_OUTPUT]
   -f, --format <FMT>       Output format [default: text] [env: MYAPP_FORMAT]
-```
-
-### Positionals ([example](examples/positionals.rs))
-
-Unnamed arguments collected in order. Chain `.required()` on the `Pos` builder to make a positional mandatory.
-
-```rust
-let parser = ArgBuilder::new()
-    .positional(Pos::new("input").desc("Input file").required())
-    .positional(Pos::new("extra").desc("Additional arguments"))
-    .build();
-```
-
-```sh
-myapp input.txt extra1 extra2
 ```
 
 ### Hidden Arguments
@@ -219,6 +216,10 @@ myapp -w10              # sets width to "10"
 # Flags + option in one token
 myapp -abcw10           # sets all, brief, color + width="10"
 myapp -abcw 10          # same — value from next token
+
+# Equals-delimited option value
+myapp -w=10             # sets width to "10"
+myapp -abcw=10          # sets all, brief, color + width="10"
 ```
 
 When the parser encounters an option character during the walk, it claims all remaining characters as the value. If none remain, it consumes the next argument token.
@@ -266,15 +267,6 @@ myapp build --help        # subcommand-specific help
 > myapp file.txt build    # "file.txt" is treated as an unknown subcommand
 > ```
 
-Access results via `subcommand()` and `subcommand_result()`:
-
-```rust
-if let Some("build") = result.subcommand() {
-    let sub = result.subcommand_result().unwrap();
-    println!("release: {}", sub.get_flag("release"));
-}
-```
-
 ### Version Flag ([example](examples/version_flag.rs))
 
 Built-in `--version` / `-V` support. Set a version string on the builder and the parser handles the rest.
@@ -300,18 +292,51 @@ The `-V` short flag is reserved when a version is configured — the builder wil
 
 When both `--help` and `--version` appear, whichever comes first wins. After `--`, both are treated as positionals.
 
-### Typed Parsing
+## Parsing and Results
 
-Parse option values into any type implementing `FromStr`. Convenience helpers collapse the common three-way match into a single call:
+### Accessors
+
+`parse_env()` reads from `std::env::args()` and returns a `Result<ParseResult, ParseError>`:
 
 ```rust
-// With a default fallback — returns the parsed value, or the default if absent/unparseable
-let jobs: u32 = result.get_option_or_default("jobs", 4);
+let result = parser.parse_env()?;
 
-// With a lazy default — closure only runs if needed
-let jobs: u32 = result.get_option_or("jobs", || num_cpus());
+// Flags return bool
+let verbose = result.get_flag("verbose");
 
-// Required with Result — use the ? operator
+// Options return Option<&str>
+let output = result.get_option("output");
+
+// Multi-value options return &[String]
+let tags = result.get_option_values("tags");
+
+// Positionals in order
+let positionals = result.get_positionals();
+
+// Subcommand access
+if let Some(name) = result.subcommand() {
+    let sub = result.subcommand_result().unwrap();
+}
+```
+
+Accessors like `get_flag` and `get_option` use string keys, so a typo like `get_flag("verbos")` would silently return `false`. To catch these during development, nanoargs includes `debug_assert!` checks that panic if you access a name that was never registered. These checks run automatically in debug builds (`cargo test`, `cargo run`) and are stripped in release builds with zero overhead.
+
+You can also pass your own args with `parser.parse(args)` — see [Error Handling](#error-handling) for the full match pattern.
+
+### Typed Parsing
+
+Parse option values into any type implementing `FromStr`. Convenience helpers collapse the common three-way match into a single call. All typed helpers return `Result<T, OptionError>`, so parse errors are always surfaced — never silently swallowed:
+
+```rust
+// With a default fallback — returns Ok(parsed) or Ok(default) if absent.
+// Returns Err on parse failure (e.g. --jobs abc).
+let jobs: u32 = result.get_option_or_default("jobs", 4)?;
+
+// With a lazy default — closure only runs if the option is absent.
+// Returns Err on parse failure without calling the closure.
+let jobs: u32 = result.get_option_or("jobs", || num_cpus())?;
+
+// Required — Err if absent or unparseable
 let jobs: u32 = result.get_option_required("jobs")?;
 ```
 
@@ -324,6 +349,26 @@ match result.get_option_parsed::<u32>("jobs") {
     None => println!("jobs not set"),
 }
 ```
+
+### Error Handling ([example](examples/error_handling.rs))
+
+```rust
+match parser.parse(args) {
+    Ok(result) => { /* use result */ }
+    Err(ParseError::HelpRequested(text)) => print!("{}", text),
+    Err(ParseError::VersionRequested(text)) => println!("{}", text),
+    Err(ParseError::MissingRequired(name)) => eprintln!("missing: {}", name),
+    Err(ParseError::MissingValue(name)) => eprintln!("no value for: --{}", name),
+    Err(ParseError::UnknownArgument(token)) => eprintln!("unknown: {}", token),
+    Err(ParseError::NoSubcommand(msg)) => eprintln!("{}", msg),
+    Err(ParseError::UnknownSubcommand(name)) => eprintln!("unknown subcommand: {}", name),
+    Err(ParseError::DuplicateOption(name)) => eprintln!("duplicate: --{}", name),
+    Err(ParseError::InvalidFormat(msg)) => eprintln!("bad format: {}", msg),
+    Err(ParseError::InvalidUtf8(lossy)) => eprintln!("invalid UTF-8: {}", lossy),
+}
+```
+
+## Help and Output
 
 ### Help Text ([example](examples/help_text.rs))
 
@@ -343,15 +388,6 @@ Options:
   -h, --help             Print help
 ```
 
-### Double-Dash Separator
-
-Everything after `--` is treated as a positional, even if it looks like a flag or option.
-
-```sh
-myapp -- --not-a-flag -abc
-# positionals: ["--not-a-flag", "-abc"]
-```
-
 ### Colored Help (opt-in)
 
 Enable the `color` feature to get ANSI-colored help text and error messages via [nanocolor](https://github.com/anthonysgro/nanocolor):
@@ -367,24 +403,16 @@ cargo run --example help_text --features color -- --help
 
 When enabled, section headers are bold yellow, flag/option names are green, placeholders are cyan, and metadata like `[default: ...]` is dim. Error messages get a bold red `error:` prefix. Color is automatically suppressed when `NO_COLOR` is set or output is not a TTY (handled by nanocolor). Without the feature, the crate remains zero-dependency and output is unchanged.
 
-### Error Handling ([example](examples/error_handling.rs))
+### Double-Dash Separator
 
-```rust
-match parser.parse(args) {
-    Ok(result) => { /* use result */ }
-    Err(ParseError::HelpRequested(text)) => print!("{}", text),
-    Err(ParseError::VersionRequested(text)) => println!("{}", text),
-    Err(ParseError::MissingRequired(name)) => eprintln!("missing: {}", name),
-    Err(ParseError::MissingValue(name)) => eprintln!("no value for: --{}", name),
-    Err(ParseError::UnknownArgument(token)) => eprintln!("unknown: {}", token),
-    Err(ParseError::NoSubcommand(msg)) => eprintln!("{}", msg),
-    Err(ParseError::UnknownSubcommand(name)) => eprintln!("unknown subcommand: {}", name),
-    Err(ParseError::DuplicateOption(name)) => eprintln!("duplicate: --{}", name),
-    Err(ParseError::InvalidFormat(msg)) => eprintln!("bad format: {}", msg),
-}
+Everything after `--` is treated as a positional, even if it looks like a flag or option.
+
+```sh
+myapp -- --not-a-flag -abc
+# positionals: ["--not-a-flag", "-abc"]
 ```
 
-### Schema-Free Parsing for Quick Scripts
+## Schema-Free Parsing for Quick Scripts
 
 `parse_loose()` skips the schema entirely — useful for throwaway scripts where defining flags and options feels like overkill.
 

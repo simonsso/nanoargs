@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "nanoargs"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Anthony Sgro"]
 build = false
 exclude = ["tests/*.proptest-regressions"]
@@ -23,6 +23,14 @@ autotests = false
 autobenches = false
 description = "A minimal, zero-dependency argument parser for Rust CLI applications"
 readme = "README.md"
+keywords = [
+    "cli",
+    "args",
+    "parser",
+    "arguments",
+    "command-line",
+]
+categories = ["command-line-interface"]
 license = "MIT"
 repository = "https://github.com/anthonysgro/nanoargs"
 
@@ -124,6 +132,10 @@ path = "tests/prop_subcommands.rs"
 [[test]]
 name = "prop_typed_helpers"
 path = "tests/prop_typed_helpers.rs"
+
+[[test]]
+name = "prop_utf8_safety"
+path = "tests/prop_utf8_safety.rs"
 
 [[test]]
 name = "prop_version"

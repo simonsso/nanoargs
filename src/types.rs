@@ -88,6 +88,9 @@ pub enum ParseError {
     UnknownSubcommand(String),
     /// A non-multi option was provided more than once. Contains the option name.
     DuplicateOption(String),
+    /// A command-line argument contained bytes that are not valid UTF-8.
+    /// Contains the lossy representation.
+    InvalidUtf8(String),
 }
 
 // ── Leaf colorization helpers for ParseError ───────────────────────────────
@@ -153,6 +156,14 @@ impl fmt::Display for ParseError {
                     "{}option {} was provided more than once (use .multi() to allow repeats)",
                     error_prefix(),
                     yellow_arg(&format!("--{name}"))
+                )
+            }
+            ParseError::InvalidUtf8(lossy) => {
+                write!(
+                    f,
+                    "{}argument is not valid UTF-8: {}",
+                    error_prefix(),
+                    yellow_arg(lossy)
                 )
             }
         }

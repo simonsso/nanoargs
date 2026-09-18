@@ -75,10 +75,16 @@ impl ArgParser {
     /// `-V`/`--version` are encountered — these are not errors per se,
     /// but signal that the caller should print the contained text and exit.
     pub fn parse(&self, args: Vec<String>) -> Result<ParseResult, ParseError> {
-        if self.subcommands.is_empty() {
-            return self.parse_no_subcommands(args);
-        }
-        self.parse_with_subcommands(args)
+        let mut result = if self.subcommands.is_empty() {
+            self.parse_no_subcommands(args)?
+        } else {
+            self.parse_with_subcommands(args)?
+        };
+        result.set_known_names(
+            self.flags.iter().map(|f| f.long.clone()).collect(),
+            self.options.iter().map(|o| o.long.clone()).collect(),
+        );
+        Ok(result)
     }
 
     /// Store an option value into the unified map. For multi-value options,
@@ -202,7 +208,7 @@ impl ArgParser {
         let after = &token[1..];
 
         if let Some(eq_pos) = after.find('=') {
-            self.handle_short_eq(after, eq_pos, token, option_values)
+            self.handle_short_eq(after, eq_pos, token, flag_values, option_values)
         } else if after.len() == 1 {
             self.handle_single_short(after, token, args, i, flag_values, option_values)
         } else {
@@ -216,18 +222,26 @@ impl ArgParser {
         after: &str,
         eq_pos: usize,
         full_token: &str,
+        flag_values: &mut HashMap<String, bool>,
         option_values: &mut HashMap<String, Vec<String>>,
     ) -> Result<(), ParseError> {
         let key_str = &after[..eq_pos];
         let value = &after[eq_pos + 1..];
+        let chars: Vec<char> = key_str.chars().collect();
 
-        if key_str.len() == 1 {
-            let ch = key_str.chars().next().unwrap();
-            if let Some(opt) = self.options.iter().find(|o| o.short == Some(ch)) {
-                Self::store_option_value(option_values, &opt.long, value.to_string(), opt.multi)?;
+        // Iterate through all characters except the last: must be registered flags.
+        for &ch in &chars[..chars.len() - 1] {
+            if let Some(flag) = self.flags.iter().find(|f| f.short == Some(ch)) {
+                flag_values.insert(flag.long.clone(), true);
             } else {
                 return Err(ParseError::UnknownArgument(full_token.to_string()));
             }
+        }
+
+        // Last character must be a registered option.
+        let last = *chars.last().unwrap();
+        if let Some(opt) = self.options.iter().find(|o| o.short == Some(last)) {
+            Self::store_option_value(option_values, &opt.long, value.to_string(), opt.multi)?;
         } else {
             return Err(ParseError::UnknownArgument(full_token.to_string()));
         }
@@ -435,7 +449,13 @@ impl ArgParser {
 
     /// Parse arguments from `std::env::args()`, skipping the program name.
     pub fn parse_env(&self) -> Result<ParseResult, ParseError> {
-        let args: Vec<String> = std::env::args().skip(1).collect();
+        let mut args = Vec::new();
+        for os_arg in std::env::args_os().skip(1) {
+            match os_arg.into_string() {
+                Ok(s) => args.push(s),
+                Err(bad) => return Err(ParseError::InvalidUtf8(bad.to_string_lossy().into_owned())),
+            }
+        }
         self.parse(args)
     }
 }

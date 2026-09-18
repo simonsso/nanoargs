@@ -32,7 +32,13 @@ use crate::types::ParseError;
 /// of your options could plausibly receive a value that starts with `-`, use
 /// [`ArgBuilder`](crate::ArgBuilder) instead.
 pub fn parse_loose() -> Result<ParseResult, ParseError> {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut args = Vec::new();
+    for os_arg in std::env::args_os().skip(1) {
+        match os_arg.into_string() {
+            Ok(s) => args.push(s),
+            Err(bad) => return Err(ParseError::InvalidUtf8(bad.to_string_lossy().into_owned())),
+        }
+    }
     parse_loose_from(args)
 }
 
@@ -43,7 +49,7 @@ pub fn parse_loose() -> Result<ParseResult, ParseError> {
 /// misclassify edge cases (e.g. `--output -v` treats `--output` as a flag
 /// and `-v` as a separate token). Callers who need exact semantics should use
 /// [`ArgBuilder`](crate::ArgBuilder).
-fn parse_loose_from(args: Vec<String>) -> Result<ParseResult, ParseError> {
+pub(crate) fn parse_loose_from(args: Vec<String>) -> Result<ParseResult, ParseError> {
     let mut flag_values: HashMap<String, bool> = HashMap::new();
     let mut option_values: HashMap<String, Option<String>> = HashMap::new();
     let mut positional_values: Vec<String> = Vec::new();
